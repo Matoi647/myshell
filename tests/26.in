@@ -1,0 +1,2 @@
+grep file2 tests/test_dir/file2 | tee /tmp/grep_result | sort | uniq | wc -l
+cat /tmp/grep_result

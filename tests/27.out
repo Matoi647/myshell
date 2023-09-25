@@ -1,0 +1,6 @@
+cat tests/test_dir/file1 | tee /tmp/out | grep text | tail
+more text
+cat /tmp/out
+file1 content
+more text
+rm /tmp/out

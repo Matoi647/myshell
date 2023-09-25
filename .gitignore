@@ -1,0 +1,4 @@
+mysh
+*.o
+tests-out/
+

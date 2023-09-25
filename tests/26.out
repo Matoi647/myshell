@@ -1,0 +1,8 @@
+grep file2 tests/test_dir/file2 | tee /tmp/grep_result | sort | uniq | wc -l
+3
+cat /tmp/grep_result
+content of file2
+content of file2
+content of file2
+file2: more lines in file2
+the last line of file2

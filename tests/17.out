@@ -1,0 +1,9 @@
+./tests/decho.sh 1 delayed &
+./tests/decho.sh 2 delayedmore &
+echo now
+now
+wait
+delayed
+delayedmore
+echo later
+later

@@ -1,0 +1,3 @@
+/bin/uname > /tmp/a.b &
+wait
+seq 3

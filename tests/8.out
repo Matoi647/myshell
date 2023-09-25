@@ -1,0 +1,6 @@
+/usr/bin/seq 2 2 8 > /tmp/test.out
+cat /tmp/test.out
+2
+4
+6
+8

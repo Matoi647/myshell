@@ -1,0 +1,17 @@
+tail -v -n +1 tests/test_dir/file1 tests/test_dir/file2 tests/test_dir/file3 tests/test_dir/file4
+==> tests/test_dir/file1 <==
+file1 content
+more text
+
+==> tests/test_dir/file2 <==
+content of file2
+content of file2
+content of file2
+another line
+file2: more lines in file2
+the last line of file2
+
+==> tests/test_dir/file3 <==
+This is file3
+
+==> tests/test_dir/file4 <==

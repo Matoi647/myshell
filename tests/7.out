@@ -1,0 +1,3 @@
+uname > /tmp/test.out
+cat /tmp/test.out
+Linux
