@@ -2,70 +2,142 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 #include <unistd.h>
 #define MAX_CMD_LEN 512 // max length of a line of command
 #define MAX_ARGC 20 // max number of arguments
-#define MAX_ARG_LEN 30 // max length of an argument
+#define MAX_ARG_LEN 50 // max length of an argument
+#define MAX_CWD_LEN 512
 
 char error_message[30] = "An error has ocurred\n";
+char cwd[MAX_CWD_LEN];
 
 
-// keep delim, remove white space
-char* my_strtok(char* str, const char* delim) {
-    static char* token;
-    static char* nextToken;
-    
-    if (str != NULL) {
-        token = str;
-    } else {
-        if (nextToken == NULL) {
-            return NULL;
+// 在特殊字符左右添加空格
+char* add_space(char *str, const char *delim) {
+    int len = strlen(str);
+    int delim_len = strlen(delim);
+    char *result = (char*)malloc(2*len*sizeof(char));
+    int i = 0;
+
+    for (int j = 0; j < len; j++) {
+        int is_delim = 0;
+        for (int k = 0; k < delim_len; k++) {
+            if (str[j] == delim[k]) {
+                is_delim = 1;
+                break;
+            }
         }
-        token = nextToken;
+
+        if (is_delim) {
+            result[i++] = ' ';
+            result[i++] = str[j];
+            result[i++] = ' ';
+        } else {
+            result[i++] = str[j];
+        }
     }
 
-    // Find the next occurrence of any delimiter character
-    nextToken = token + strcspn(token, delim);
-
-    if (*nextToken != '\0') {
-        *nextToken = '\0';
-        nextToken++;
-    } else {
-        nextToken = NULL;
-    }
-
-    return token;
+    result[i] = '\0';
+    return result;
 }
 
-
-
-int parse_command(char* cmd, char** tokens)
+int parse_command(char* line, char** tokens)
 {
-    const char delim[] = " <>&"; // TODO: distinguish < and <<
+    const char special_char[] = "<>&";
+    char* cmd = add_space(line, special_char);
+    const char delim[] = " ";
     int token_num = 0;
-    char* token = my_strtok(cmd, delim);
+
+    char* token = strtok(cmd, delim);
 
     while (token != NULL && token_num < MAX_ARGC) {
         tokens[token_num++] = token;
-        token = my_strtok(NULL, delim);
+        token = strtok(NULL, delim);
     }
 
     return token_num;
 }
 
-int do_command(int argc, char** argv)
+int redirection(char* argv[], char* inputFile, char* outputFile, int option)
 {
-    int rc = fork();
-    if (rc < 0) {
-        fprintf(stderr, "fork failed\n");
-        exit(EXIT_FAILURE);
-    } else if (rc == 0) {
+    
+}
 
-        execvp(argv[0], argv);
-    } else {
-        int rc_wait = wait(NULL);
+int is_special_cmd(char* arg, char** special_cmd, int special_num){
+    int res = 0;
+    for(int i = 0;i < special_num; i++){
+        if(strcmp(arg, special_cmd[i])==0){
+            res = 1;
+        }
     }
+    return res;
+}
+
+int handle_command(int argc, char** argv)
+{
+    char* atom_cmd[MAX_ARGC];   // command without special character
+    int i = 0, j = 0;
+    char* special_cmd[3] = {"<", ">", "&"};
+    while(argv[i] != NULL){
+        if(is_special_cmd(argv[i], special_cmd, 3)){
+            break;
+        }
+        atom_cmd[i] = argv[i];
+        i++;
+    }
+
+    if(strcmp(argv[0], "exit")==0){
+        exit(0);
+    } else if(strcmp(argv[0], "pwd")==0){
+        // if I/O redirection is used
+        if(argv[i] != NULL){
+            if(strcmp(argv[i], ">") == 0 && argv[i+1] != NULL) {
+                int fd = open(argv[i+1], O_CREAT | O_TRUNC | O_WRONLY, 0666);
+                if (fd == -1){
+                    perror("open falied\n");
+                    return 1;
+                }
+                int fd_stdout = dup(STDOUT_FILENO);
+                // redirect to file
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+                printf("%s\n", getcwd(cwd, MAX_CMD_LEN));
+                // redirect back to stdout
+                dup2(fd_stdout, STDOUT_FILENO);
+            } else {
+                // redirection command format error
+                // perror("redirection command format error");
+                write(STDERR_FILENO, error_message, strlen(error_message));
+                return -1;
+            }
+        } else {
+            printf("%s\n", getcwd(cwd, MAX_CMD_LEN));
+        }
+    } else if(strcmp(argv[0], "cd")==0){
+        // if no argument for cd
+        if (argv[1] == NULL){
+            chdir(getenv("HOME"));
+            // printf(getenv("HOME"));
+        } else {
+            if (chdir(argv[1]) == -1){
+                // no such directory
+                write(STDERR_FILENO, error_message, strlen(error_message));
+                return -1;
+            }
+        }
+    } else if(strcmp(argv[0], "wait")==0){
+        
+    } else {
+        
+    }
+
     return 0;
+}
+
+int excute_command(int argc, char** argv)
+{
+
 }
 
 int main(int argc, char** argv)
@@ -79,16 +151,16 @@ int main(int argc, char** argv)
         fgets(line, sizeof(line), stdin);
         line[strcspn(line, "\n")] = '\0'; // replace '\n' with '\0' (null)
         if (strlen(line) > MAX_CMD_LEN) {
-            write(STDERR_FILENO, "too long command, ", strlen("too long command, "));
+            // too long command
             write(STDERR_FILENO, error_message, strlen(error_message));
         }
-        printf("len=%ld, %s\n", strlen(line), line);
+        // printf("len=%ld, %s\n", strlen(line), line);
 
         int token_num = parse_command(line, tokens);
-        for (int i = 0; i < token_num; i++) {
-            printf("Token %d: %s, len=%ld\n", i, tokens[i], strlen(tokens[i]));
-        }
-        do_command(token_num, tokens);
+        // for (int i = 0; i < token_num; i++) {
+        //     printf("Token %d: %s, len=%ld\n", i, tokens[i], strlen(tokens[i]));
+        // }
+        handle_command(token_num, tokens);
     }
     return 0;
 }
