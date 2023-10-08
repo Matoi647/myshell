@@ -42,7 +42,7 @@ char* add_space(char *str, const char *delim) {
     return result;
 }
 
-int parse_command(char* line, char** tokens)
+int parse_line(char* line, char** tokens)
 {
     const char special_char[] = "<>&";
     char* cmd = add_space(line, special_char);
@@ -74,28 +74,60 @@ int is_special_cmd(char* arg, char** special_cmd, int special_num){
     return res;
 }
 
+int execute_command(char** argv, int background){
+    int rc = fork();
+    if (rc < 0){
+        // fork falied
+        write(STDERR_FILENO, error_message, strlen(error_message));
+        return 1;
+    } else if (rc == 0) {
+        execvp(argv[0], argv);
+        // if(execvp(argv[0], argv) == -1){
+        //     // command not found
+        //     write(STDERR_FILENO, error_message, strlen(error_message));
+        // }
+    } else {
+        if (background == 0){
+            int rc_wait = wait(NULL);
+        }
+    }
+    return 0;
+}
+
 int handle_command(int argc, char** argv)
 {
     char* atom_cmd[MAX_ARGC];   // command without special character
-    int i = 0, j = 0;
+    int background = 0;
+
     char* special_cmd[3] = {"<", ">", "&"};
-    while(argv[i] != NULL){
+    int special_idx = -1;
+    for(int i = 0; i < argc; i++){
         if(is_special_cmd(argv[i], special_cmd, 3)){
+            special_idx = i;
             break;
         }
         atom_cmd[i] = argv[i];
-        i++;
     }
+    // trailing ampersand
+    if(strcmp(argv[argc-1], "&") == 0){
+        background = 1;
+    }
+    // for(int i = 0; i < argc; i++){
+    //     if(strcmp(argv[i], "&") == 0){
+    //         background = 1;
+    //     }
+    // }
 
     if(strcmp(argv[0], "exit")==0){
         exit(0);
     } else if(strcmp(argv[0], "pwd")==0){
         // if I/O redirection is used
-        if(argv[i] != NULL){
-            if(strcmp(argv[i], ">") == 0 && argv[i+1] != NULL) {
-                int fd = open(argv[i+1], O_CREAT | O_TRUNC | O_WRONLY, 0666);
+        if(special_idx > 0){
+            if(strcmp(argv[special_idx], ">") == 0 && argv[special_idx+1] != NULL) {
+                int fd = open(argv[special_idx+1], O_CREAT | O_TRUNC | O_WRONLY, 0666);
                 if (fd == -1){
-                    perror("open falied\n");
+                    // perror("open falied\n");
+                    write(STDERR_FILENO, error_message, strlen(error_message));
                     return 1;
                 }
                 int fd_stdout = dup(STDOUT_FILENO);
@@ -109,7 +141,7 @@ int handle_command(int argc, char** argv)
                 // redirection command format error
                 // perror("redirection command format error");
                 write(STDERR_FILENO, error_message, strlen(error_message));
-                return -1;
+                return 1;
             }
         } else {
             printf("%s\n", getcwd(cwd, MAX_CMD_LEN));
@@ -129,15 +161,15 @@ int handle_command(int argc, char** argv)
     } else if(strcmp(argv[0], "wait")==0){
         
     } else {
-        
+        // I/O redirection is used
+        if(special_idx > 0){
+
+        } else {
+            execute_command(atom_cmd, background);
+        }
     }
 
     return 0;
-}
-
-int excute_command(int argc, char** argv)
-{
-
 }
 
 int main(int argc, char** argv)
@@ -156,7 +188,7 @@ int main(int argc, char** argv)
         }
         // printf("len=%ld, %s\n", strlen(line), line);
 
-        int token_num = parse_command(line, tokens);
+        int token_num = parse_line(line, tokens);
         // for (int i = 0; i < token_num; i++) {
         //     printf("Token %d: %s, len=%ld\n", i, tokens[i], strlen(tokens[i]));
         // }
