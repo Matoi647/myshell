@@ -12,7 +12,7 @@
 char error_message[30] = "An error has ocurred\n";
 char cwd[MAX_CWD_LEN];
 
-// 在特殊字符左右添加空格
+// add space near special character
 char* add_space(char* str, const char* delim)
 {
     int len = strlen(str);
@@ -46,7 +46,7 @@ int parse_line(char* line, char** tokens)
 {
     const char special_char[] = "<>&";
     char* cmd = add_space(line, special_char);
-    const char delim[] = " ";
+    const char delim[] = " \t\n\r";
     int token_num = 0;
 
     char* token = strtok(cmd, delim);
@@ -123,7 +123,7 @@ int execute_command(char** argv, int background)
         // }
     } else {
         if (background == 0) {
-            int rc_wait = wait(NULL);
+            wait(NULL);
         }
     }
     return 0;
@@ -174,7 +174,8 @@ int handle_command(int argc, char** argv)
                 // redirect to file
                 dup2(fd, STDOUT_FILENO);
                 close(fd);
-                printf("%s\n", getcwd(cwd, MAX_CMD_LEN));
+                write(STDOUT_FILENO, getcwd(cwd, MAX_CMD_LEN), strlen(getcwd(cwd, MAX_CMD_LEN)));
+                // printf("%s\n", getcwd(cwd, MAX_CMD_LEN));
                 // redirect back to stdout
                 dup2(fd_stdout, STDOUT_FILENO);
             }
@@ -185,7 +186,8 @@ int handle_command(int argc, char** argv)
             //     return 1;
             // }
         } else {
-            printf("%s\n", getcwd(cwd, MAX_CMD_LEN));
+            // printf("%s\n", getcwd(cwd, MAX_CMD_LEN));
+            write(STDOUT_FILENO, getcwd(cwd, MAX_CMD_LEN), strlen(getcwd(cwd, MAX_CMD_LEN)));
         }
     } else if (strcmp(argv[0], "cd") == 0) {
         // if no argument for cd
@@ -201,7 +203,10 @@ int handle_command(int argc, char** argv)
             }
         }
     } else if (strcmp(argv[0], "wait") == 0) {
-
+        int pid = wait(NULL);
+        while (pid > 0) {
+            pid = wait(NULL);
+        }
     } else {
         if (special_idx > 0) {
             // redirection is used
@@ -237,18 +242,25 @@ int main(int argc, char** argv)
         // batch mode
         char* filename = argv[1];
         if (filename != NULL) {
-            FILE* file;
-            file = fopen(filename, "r");
-            if (file == NULL) {
-                perror("open failed\n");
+            // input redirection
+            int fd = open(filename, O_RDONLY, 0666);
+            if (fd == -1) {
+                perror("open falied\n");
+                write(STDERR_FILENO, error_message, strlen(error_message));
                 return 1;
             }
+            dup2(fd, STDIN_FILENO);
+            close(fd);
 
             char line[MAX_CMD_LEN + 2];
             char* tokens[MAX_ARGC];
-            memset(line, 0, (MAX_CMD_LEN + 2) * sizeof(char));
-            memset(tokens, 0, MAX_ARGC * sizeof(char*));
-            while (fgets(line, sizeof(line), file)) {
+            while (1) {
+                // write(STDOUT_FILENO, "mysh> ", strlen("mysh> "));
+                // printf("mysh> ");
+                memset(line, 0, (MAX_CMD_LEN + 2) * sizeof(char));
+                if(fgets(line, sizeof(line), stdin) == NULL){
+                    break;
+                }
                 write(STDOUT_FILENO, line, strlen(line));
 
                 line[strcspn(line, "\n")] = '\0'; // replace '\n' with '\0' (null)
@@ -257,14 +269,10 @@ int main(int argc, char** argv)
                     write(STDERR_FILENO, error_message, strlen(error_message));
                 }
 
+                memset(tokens, 0, MAX_ARGC * sizeof(char*));
                 int token_num = parse_line(line, tokens);
                 handle_command(token_num, tokens);
-
-                memset(line, 0, (MAX_CMD_LEN + 2) * sizeof(char));
-                memset(tokens, 0, MAX_ARGC * sizeof(char*));
             }
-
-            fclose(file);
         }
     } else {
         // interactive mode
