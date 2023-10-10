@@ -220,19 +220,30 @@ int handle_command(int argc, char** argv)
             // redirection is used
             if (strcmp(argv[redirection_idx], "<") == 0) {
                 if (argv[redirection_idx + 1] != NULL
-                    && argv[redirection_idx + 2] == NULL) {
+                    && (argv[redirection_idx + 2] == NULL 
+                        || strcmp(argv[redirection_idx + 2], "&") == 0)) {
                     // input redirection
                     redirection(atom_cmd, argv[redirection_idx + 1], NULL, background);
                 } else if (argv[redirection_idx + 1] != NULL
                     && strcmp(argv[redirection_idx + 2], ">") == 0
-                    && argv[redirection_idx + 3] != NULL) {
+                    && argv[redirection_idx + 3] != NULL
+                    && (argv[redirection_idx + 4] == NULL
+                        || strcmp(argv[redirection_idx + 4], "&") == 0)) {
                     // input and out redirection
                     redirection(atom_cmd, argv[redirection_idx + 1], argv[redirection_idx + 3], background);
+                } else {
+                    // redirection format error
+                    write(STDERR_FILENO, error_message, strlen(error_message));
                 }
             } else if (strcmp(argv[redirection_idx], ">") == 0) {
-                // output redirection
-                if (argv[redirection_idx + 1] != NULL) {
+                if (argv[redirection_idx + 1] != NULL
+                    && (argv[redirection_idx + 2] == NULL
+                        || strcmp(argv[redirection_idx + 2], "&") == 0)) {
+                    // output redirection
                     redirection(atom_cmd, NULL, argv[redirection_idx + 1], background);
+                } else {
+                    // redirection format error
+                    write(STDERR_FILENO, error_message, strlen(error_message));
                 }
             }
         } else {
