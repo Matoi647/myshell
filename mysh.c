@@ -88,7 +88,7 @@ int redirection(char* argv[], char* inputFile, char* outputFile, int background)
             close(fd);
         }
         if (execvp(argv[0], argv) == -1) {
-            // command not found
+            // perror("subprocess command execution falied\n");
             write(STDERR_FILENO, error_message, strlen(error_message));
         }
     } else {
@@ -114,14 +114,12 @@ int execute_command(char** argv, int background)
 {
     int pid = fork();
     if (pid < 0) {
-        // fork falied
         // perror("fork failed\n");
         write(STDERR_FILENO, error_message, strlen(error_message));
         return 1;
     } else if (pid == 0) {
-        // execvp(argv[0], argv);
         if (execvp(argv[0], argv) == -1) {
-            // command not found
+            // perror("subprocess command execution falied\n");
             write(STDERR_FILENO, error_message, strlen(error_message));
         }
     } else {
@@ -150,10 +148,10 @@ int handle_command(int argc, char** argv)
         atom_cmd[i] = argv[i];
     }
 
-    int redirection_idx = -1;
+    int redir_idx = -1;   // redirection character index
     for (int i = 0; i < argc; i++) {
         if (strcmp(argv[i], "<") == 0 || strcmp(argv[i], ">") == 0) {
-            redirection_idx = i;
+            redir_idx = i;
             break;
         }
     }
@@ -167,15 +165,16 @@ int handle_command(int argc, char** argv)
         if (argv[1] == NULL) {
             exit(0);
         } else {
+            // perror("exit falied\n");
             write(STDERR_FILENO, error_message, strlen(error_message));
         }
 
     } else if (strcmp(argv[0], "pwd") == 0) {
         if (argv[1] == NULL) {
-            // printf("%s\n", getcwd(cwd, MAX_CMD_LEN));
             write(STDOUT_FILENO, getcwd(cwd, MAX_CMD_LEN), strlen(getcwd(cwd, MAX_CMD_LEN)));
             write(STDOUT_FILENO, "\n", strlen("\n"));
         } else {
+            // perror("pwd command format error\n");
             write(STDERR_FILENO, error_message, strlen(error_message));
         }
     } else if (strcmp(argv[0], "cd") == 0) {
@@ -205,31 +204,31 @@ int handle_command(int argc, char** argv)
         }
 
     } else {
-        if (redirection_idx > 0) {
+        if (redir_idx > 0) {
             // redirection is used
-            if (strcmp(argv[redirection_idx], "<") == 0) {
-                if (argv[redirection_idx + 1] != NULL
-                    && (argv[redirection_idx + 2] == NULL
-                        || strcmp(argv[redirection_idx + 2], "&") == 0)) {
+            if (strcmp(argv[redir_idx], "<") == 0) {
+                if (argv[redir_idx + 1] != NULL
+                    && (argv[redir_idx + 2] == NULL
+                        || strcmp(argv[redir_idx + 2], "&") == 0)) {
                     // input redirection
-                    redirection(atom_cmd, argv[redirection_idx + 1], NULL, background);
-                } else if (argv[redirection_idx + 1] != NULL
-                    && strcmp(argv[redirection_idx + 2], ">") == 0
-                    && argv[redirection_idx + 3] != NULL
-                    && (argv[redirection_idx + 4] == NULL
-                        || strcmp(argv[redirection_idx + 4], "&") == 0)) {
+                    redirection(atom_cmd, argv[redir_idx + 1], NULL, background);
+                } else if (argv[redir_idx + 1] != NULL
+                    && strcmp(argv[redir_idx + 2], ">") == 0
+                    && argv[redir_idx + 3] != NULL
+                    && (argv[redir_idx + 4] == NULL
+                        || strcmp(argv[redir_idx + 4], "&") == 0)) {
                     // input and out redirection
-                    redirection(atom_cmd, argv[redirection_idx + 1], argv[redirection_idx + 3], background);
+                    redirection(atom_cmd, argv[redir_idx + 1], argv[redir_idx + 3], background);
                 } else {
                     // redirection format error
                     write(STDERR_FILENO, error_message, strlen(error_message));
                 }
-            } else if (strcmp(argv[redirection_idx], ">") == 0) {
-                if (argv[redirection_idx + 1] != NULL
-                    && (argv[redirection_idx + 2] == NULL
-                        || strcmp(argv[redirection_idx + 2], "&") == 0)) {
+            } else if (strcmp(argv[redir_idx], ">") == 0) {
+                if (argv[redir_idx + 1] != NULL
+                    && (argv[redir_idx + 2] == NULL
+                        || strcmp(argv[redir_idx + 2], "&") == 0)) {
                     // output redirection
-                    redirection(atom_cmd, NULL, argv[redirection_idx + 1], background);
+                    redirection(atom_cmd, NULL, argv[redir_idx + 1], background);
                 } else {
                     // redirection format error
                     write(STDERR_FILENO, error_message, strlen(error_message));
