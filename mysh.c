@@ -171,56 +171,45 @@ int handle_command(int argc, char** argv)
         }
 
     } else if (strcmp(argv[0], "pwd") == 0) {
-        // if redirection is used
-        if (redirection_idx > 0) {
-            if (strcmp(argv[redirection_idx], ">") == 0 && argv[redirection_idx + 1] != NULL) {
-                int fd = open(argv[redirection_idx + 1], O_CREAT | O_TRUNC | O_WRONLY, 0666);
-                if (fd == -1) {
-                    // perror("open falied\n");
-                    write(STDERR_FILENO, error_message, strlen(error_message));
-                    return 1;
-                }
-                int fd_stdout = dup(STDOUT_FILENO);
-                // redirect to file
-                dup2(fd, STDOUT_FILENO);
-                close(fd);
-                write(STDOUT_FILENO, getcwd(cwd, MAX_CMD_LEN), strlen(getcwd(cwd, MAX_CMD_LEN)));
-                write(STDOUT_FILENO, "\n", strlen("\n"));
-                // redirect back to stdout
-                dup2(fd_stdout, STDOUT_FILENO);
-            }
+        if (argv[1] == NULL) {
+            // printf("%s\n", getcwd(cwd, MAX_CMD_LEN));
+            write(STDOUT_FILENO, getcwd(cwd, MAX_CMD_LEN), strlen(getcwd(cwd, MAX_CMD_LEN)));
+            write(STDOUT_FILENO, "\n", strlen("\n"));
         } else {
-            if (argv[1] == NULL) {
-                // printf("%s\n", getcwd(cwd, MAX_CMD_LEN));
-                write(STDOUT_FILENO, getcwd(cwd, MAX_CMD_LEN), strlen(getcwd(cwd, MAX_CMD_LEN)));
-                write(STDOUT_FILENO, "\n", strlen("\n"));
-            } else {
-                write(STDERR_FILENO, error_message, strlen(error_message));
-            }
+            write(STDERR_FILENO, error_message, strlen(error_message));
         }
     } else if (strcmp(argv[0], "cd") == 0) {
         // if no argument for cd
         if (argv[1] == NULL) {
             chdir(getenv("HOME"));
             // printf(getenv("HOME"));
-        } else {
+        } else if (argv[1] != NULL && argv[2] == NULL) {
             if (chdir(argv[1]) == -1) {
                 // perror("no such directory\n");
                 write(STDERR_FILENO, error_message, strlen(error_message));
             }
+        } else {
+            // perror("cd command format error\n");
+            write(STDERR_FILENO, error_message, strlen(error_message));
         }
     } else if (strcmp(argv[0], "wait") == 0) {
-        int status;
-        int wpid = wait(&status);
-        while (wpid > 0) {
-            wpid = wait(&status);
+        if (argv[1] == NULL) {
+            int status;
+            int wpid = wait(&status);
+            while (wpid > 0) {
+                wpid = wait(&status);
+            }
+        } else {
+            // perror("wait command format error\n");
+            write(STDERR_FILENO, error_message, strlen(error_message));
         }
+
     } else {
         if (redirection_idx > 0) {
             // redirection is used
             if (strcmp(argv[redirection_idx], "<") == 0) {
                 if (argv[redirection_idx + 1] != NULL
-                    && (argv[redirection_idx + 2] == NULL 
+                    && (argv[redirection_idx + 2] == NULL
                         || strcmp(argv[redirection_idx + 2], "&") == 0)) {
                     // input redirection
                     redirection(atom_cmd, argv[redirection_idx + 1], NULL, background);
