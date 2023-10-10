@@ -9,7 +9,7 @@
 #define MAX_ARG_LEN 50 // max length of an argument
 #define MAX_CWD_LEN 512
 
-char error_message[30] = "An error has ocurred\n";
+char error_message[30] = "An error has occurred\n";
 char cwd[MAX_CWD_LEN];
 
 // add space near special character
@@ -61,16 +61,16 @@ int parse_line(char* line, char** tokens)
 
 int redirection(char* argv[], char* inputFile, char* outputFile, int background)
 {
-    int rc = fork();
-    if (rc < 0) {
-        perror("fork falied\n");
+    int pid = fork();
+    if (pid < 0) {
+        // perror("fork falied\n");
         write(STDERR_FILENO, error_message, strlen(error_message));
         return 1;
-    } else if (rc == 0) {
+    } else if (pid == 0) {
         if (inputFile != NULL) {
             int fd = open(inputFile, O_RDONLY, 0666);
             if (fd == -1) {
-                perror("open falied\n");
+                // perror("open falied\n");
                 write(STDERR_FILENO, error_message, strlen(error_message));
                 return 1;
             }
@@ -80,20 +80,23 @@ int redirection(char* argv[], char* inputFile, char* outputFile, int background)
         if (outputFile != NULL) {
             int fd = open(outputFile, O_CREAT | O_TRUNC | O_WRONLY, 0666);
             if (fd == -1) {
-                perror("open falied\n");
+                // perror("open falied\n");
                 write(STDERR_FILENO, error_message, strlen(error_message));
                 return 1;
             }
             dup2(fd, STDOUT_FILENO);
             close(fd);
         }
-        execvp(argv[0], argv);
+        if (execvp(argv[0], argv) == -1) {
+            // command not found
+            write(STDERR_FILENO, error_message, strlen(error_message));
+        }
     } else {
         if (background == 0) {
-            int rc_wait = wait(NULL);
+            int status;
+            waitpid(pid, &status, 0);
         }
     }
-    return 0;
 }
 
 int is_special_cmd(char* arg, char** special_cmd, int special_num)
@@ -109,24 +112,24 @@ int is_special_cmd(char* arg, char** special_cmd, int special_num)
 
 int execute_command(char** argv, int background)
 {
-    int rc = fork();
-    if (rc < 0) {
+    int pid = fork();
+    if (pid < 0) {
         // fork falied
-        perror("fork failed\n");
+        // perror("fork failed\n");
         write(STDERR_FILENO, error_message, strlen(error_message));
         return 1;
-    } else if (rc == 0) {
-        execvp(argv[0], argv);
-        // if(execvp(argv[0], argv) == -1){
-        //     // command not found
-        //     write(STDERR_FILENO, error_message, strlen(error_message));
-        // }
+    } else if (pid == 0) {
+        // execvp(argv[0], argv);
+        if (execvp(argv[0], argv) == -1) {
+            // command not found
+            write(STDERR_FILENO, error_message, strlen(error_message));
+        }
     } else {
         if (background == 0) {
-            wait(NULL);
+            int status;
+            waitpid(pid, &status, 0);
         }
     }
-    return 0;
 }
 
 int handle_command(int argc, char** argv)
@@ -139,34 +142,41 @@ int handle_command(int argc, char** argv)
     memset(atom_cmd, 0, MAX_ARGC * sizeof(char*));
     int background = 0;
 
-    char* special_cmd[3] = { "<", ">", "&" };
-    int special_idx = -1;
+    char* special_char[3] = { "<", ">", "&" };
     for (int i = 0; i < argc; i++) {
-        if (is_special_cmd(argv[i], special_cmd, 3)) {
-            special_idx = i;
+        if (is_special_cmd(argv[i], special_char, 3)) {
             break;
         }
         atom_cmd[i] = argv[i];
     }
+
+    int redirection_idx = -1;
+    for (int i = 0; i < argc; i++) {
+        if (strcmp(argv[i], "<") == 0 || strcmp(argv[i], ">") == 0) {
+            redirection_idx = i;
+            break;
+        }
+    }
+
     // trailing ampersand
     if (strcmp(argv[argc - 1], "&") == 0) {
         background = 1;
     }
-    // for(int i = 0; i < argc; i++){
-    //     if(strcmp(argv[i], "&") == 0){
-    //         background = 1;
-    //     }
-    // }
 
     if (strcmp(argv[0], "exit") == 0) {
-        exit(0);
+        if (argv[1] == NULL) {
+            exit(0);
+        } else {
+            write(STDERR_FILENO, error_message, strlen(error_message));
+        }
+
     } else if (strcmp(argv[0], "pwd") == 0) {
         // if redirection is used
-        if (special_idx > 0) {
-            if (strcmp(argv[special_idx], ">") == 0 && argv[special_idx + 1] != NULL) {
-                int fd = open(argv[special_idx + 1], O_CREAT | O_TRUNC | O_WRONLY, 0666);
+        if (redirection_idx > 0) {
+            if (strcmp(argv[redirection_idx], ">") == 0 && argv[redirection_idx + 1] != NULL) {
+                int fd = open(argv[redirection_idx + 1], O_CREAT | O_TRUNC | O_WRONLY, 0666);
                 if (fd == -1) {
-                    perror("open falied\n");
+                    // perror("open falied\n");
                     write(STDERR_FILENO, error_message, strlen(error_message));
                     return 1;
                 }
@@ -175,19 +185,18 @@ int handle_command(int argc, char** argv)
                 dup2(fd, STDOUT_FILENO);
                 close(fd);
                 write(STDOUT_FILENO, getcwd(cwd, MAX_CMD_LEN), strlen(getcwd(cwd, MAX_CMD_LEN)));
-                // printf("%s\n", getcwd(cwd, MAX_CMD_LEN));
+                write(STDOUT_FILENO, "\n", strlen("\n"));
                 // redirect back to stdout
                 dup2(fd_stdout, STDOUT_FILENO);
             }
-            //  else {
-            //     // redirection command format error
-            //     perror("redirection command format error\n");
-            //     write(STDERR_FILENO, error_message, strlen(error_message));
-            //     return 1;
-            // }
         } else {
-            // printf("%s\n", getcwd(cwd, MAX_CMD_LEN));
-            write(STDOUT_FILENO, getcwd(cwd, MAX_CMD_LEN), strlen(getcwd(cwd, MAX_CMD_LEN)));
+            if (argv[1] == NULL) {
+                // printf("%s\n", getcwd(cwd, MAX_CMD_LEN));
+                write(STDOUT_FILENO, getcwd(cwd, MAX_CMD_LEN), strlen(getcwd(cwd, MAX_CMD_LEN)));
+                write(STDOUT_FILENO, "\n", strlen("\n"));
+            } else {
+                write(STDERR_FILENO, error_message, strlen(error_message));
+            }
         }
     } else if (strcmp(argv[0], "cd") == 0) {
         // if no argument for cd
@@ -196,35 +205,34 @@ int handle_command(int argc, char** argv)
             // printf(getenv("HOME"));
         } else {
             if (chdir(argv[1]) == -1) {
-                // no such directory
-                perror("no such directory\n");
+                // perror("no such directory\n");
                 write(STDERR_FILENO, error_message, strlen(error_message));
-                return -1;
             }
         }
     } else if (strcmp(argv[0], "wait") == 0) {
-        int pid = wait(NULL);
-        while (pid > 0) {
-            pid = wait(NULL);
+        int status;
+        int wpid = wait(&status);
+        while (wpid > 0) {
+            wpid = wait(&status);
         }
     } else {
-        if (special_idx > 0) {
+        if (redirection_idx > 0) {
             // redirection is used
-            if (strcmp(argv[special_idx], "<") == 0) {
-                if (argv[special_idx + 1] != NULL
-                    && argv[special_idx + 2] == NULL) {
+            if (strcmp(argv[redirection_idx], "<") == 0) {
+                if (argv[redirection_idx + 1] != NULL
+                    && argv[redirection_idx + 2] == NULL) {
                     // input redirection
-                    redirection(atom_cmd, argv[special_idx + 1], NULL, background);
-                } else if (argv[special_idx + 1] != NULL
-                    && strcmp(argv[special_idx + 2], ">") == 0
-                    && argv[special_idx + 3] != NULL) {
+                    redirection(atom_cmd, argv[redirection_idx + 1], NULL, background);
+                } else if (argv[redirection_idx + 1] != NULL
+                    && strcmp(argv[redirection_idx + 2], ">") == 0
+                    && argv[redirection_idx + 3] != NULL) {
                     // input and out redirection
-                    redirection(atom_cmd, argv[special_idx + 1], argv[special_idx + 3], background);
+                    redirection(atom_cmd, argv[redirection_idx + 1], argv[redirection_idx + 3], background);
                 }
-            } else if (strcmp(argv[special_idx], ">") == 0) {
+            } else if (strcmp(argv[redirection_idx], ">") == 0) {
                 // output redirection
-                if (argv[special_idx + 1] != NULL) {
-                    redirection(atom_cmd, NULL, argv[special_idx + 1], background);
+                if (argv[redirection_idx + 1] != NULL) {
+                    redirection(atom_cmd, NULL, argv[redirection_idx + 1], background);
                 }
             }
         } else {
@@ -232,8 +240,6 @@ int handle_command(int argc, char** argv)
             execute_command(atom_cmd, background);
         }
     }
-
-    return 0;
 }
 
 int main(int argc, char** argv)
@@ -245,7 +251,7 @@ int main(int argc, char** argv)
             // input redirection
             int fd = open(filename, O_RDONLY, 0666);
             if (fd == -1) {
-                perror("open falied\n");
+                // perror("open falied\n");
                 write(STDERR_FILENO, error_message, strlen(error_message));
                 return 1;
             }
@@ -254,13 +260,11 @@ int main(int argc, char** argv)
 
             char line[MAX_CMD_LEN + 2];
             char* tokens[MAX_ARGC];
-            while (1) {
+            memset(line, 0, (MAX_CMD_LEN + 2) * sizeof(char));
+            memset(tokens, 0, MAX_ARGC * sizeof(char*));
+            while (fgets(line, sizeof(line), stdin) != NULL) {
                 // write(STDOUT_FILENO, "mysh> ", strlen("mysh> "));
                 // printf("mysh> ");
-                memset(line, 0, (MAX_CMD_LEN + 2) * sizeof(char));
-                if(fgets(line, sizeof(line), stdin) == NULL){
-                    break;
-                }
                 write(STDOUT_FILENO, line, strlen(line));
 
                 line[strcspn(line, "\n")] = '\0'; // replace '\n' with '\0' (null)
@@ -269,9 +273,10 @@ int main(int argc, char** argv)
                     write(STDERR_FILENO, error_message, strlen(error_message));
                 }
 
-                memset(tokens, 0, MAX_ARGC * sizeof(char*));
                 int token_num = parse_line(line, tokens);
                 handle_command(token_num, tokens);
+                memset(line, 0, (MAX_CMD_LEN + 2) * sizeof(char));
+                memset(tokens, 0, MAX_ARGC * sizeof(char*));
             }
         }
     } else {
