@@ -1,2 +1,0 @@
-/bin/ls > /tmp/1.out /tmp/2.out
-uname

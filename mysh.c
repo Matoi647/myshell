@@ -5,8 +5,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #define MAX_CMD_LEN 512 // max length of a line of command
-#define MAX_ARGC 20 // max number of arguments
-#define MAX_ARG_LEN 50 // max length of an argument
+#define MAX_ARGC 20     // max number of arguments
+#define MAX_ARG_LEN 50  // max length of an argument
 #define MAX_CWD_LEN 512
 
 char error_message[30] = "An error has occurred\n";

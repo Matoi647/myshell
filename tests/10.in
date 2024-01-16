@@ -1,1 +1,0 @@
-tail -v -n +1 tests/test_dir/file1 tests/test_dir/file2 tests/test_dir/file3 tests/test_dir/file4

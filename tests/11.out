@@ -1,5 +1,0 @@
-rm -f /tmp/1
-echo hello>/tmp/1&
-wait
-cat /tmp/1
-hello
